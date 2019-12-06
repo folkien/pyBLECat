@@ -8,6 +8,7 @@ parser.add_argument("-i", "--inputFile", type=str, required=False, help="input f
 parser.add_argument("-o", "--outputFile", type=str, required=False, help="output file")
 parser.add_argument("-c", "--command", type=str, required=False, help="Send raw text command instead of input file")
 parser.add_argument("-f", "--frameSize", type=int, required=False, help="Size of transmited frame")
+parser.add_argument("-t", "--timeout", type=int, required=False, help="Timeout during transmission/receiving")
 parser.add_argument("-d", "--device", type=str, required=True, help="BLE device MAC address")
 args = parser.parse_args()
 
@@ -15,13 +16,25 @@ defaultReadChar = None
 defaultWriteChar = None
 defaultNotifyChar = None
 defaultFrameSize=256
+defaultTimeout=1
 
 # Args - set default frameSize
 if (args.frameSize is not None):
     defaultFrameSize=args.frameSize
 
-sys.stdout.write("Connecting to %s.\n" % args.device)
-dev = btle.Peripheral(args.device)
+if (args.timeout is not None):
+    defaultTimeout=args.timeout
+
+class ReadDelegate(btle.DefaultDelegate):
+    def __init__(self, params = 0):
+        btle.DefaultDelegate.__init__(self)
+        # ... initialise here
+
+    def handleNotification(self, cHandle, data):
+        # ... perhaps check cHandle
+        # ... process 'data'
+        sys.stdout.write("Read %s from %s .\n" % (repr(rxData), cHandle))
+
 
 # Function to Get BLE device info
 def GetDeviceInfo(dev):
@@ -59,11 +72,23 @@ def TransmittData(char,data,limit):
 
 # Read data from device characteristics
 # timeout given i seconds
-def ReceiveData(char,rxData,timeout=1):
+def ReceiveData(dev,char,timeout=1):
+    resp = dev.waitForNotifications(timeout)
+    print "resp=",resp
     startTime=time.time()
     while ((time.time() - startTime) < timeout):
         rxData = char.read()
         sys.stdout.write("Read %s from characteristic %s.\n" % (repr(rxData), char.uuid))
+
+# BLE connection
+sys.stdout.write("Connecting to %s.\n" % args.device)
+dev = btle.Peripheral(args.device)
+dev.setDelegate( ReadDelegate() )
+
+# enable notifcations
+notifyConf = dev.getCharacteristics(btle.UUID(0x2902))
+notifyConf.write(0x0100)
+#dev.writeCharacteristic(0x2902,0x0100)
 
 # Always get device info and read
 GetDeviceInfo(dev)
@@ -71,7 +96,6 @@ GetDeviceInfo(dev)
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
-        rxData=""
         TransmittData(defaultWriteChar,args.command+"\n", defaultFrameSize)
-        ReceiveData(defaultWriteChar,rxData)
+        ReceiveData(dev,defaultWriteChar,defaultTimeout)
 
