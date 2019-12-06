@@ -7,13 +7,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--inputFile", type=str, required=False, help="input file")
 parser.add_argument("-o", "--outputFile", type=str, required=False, help="output file")
 parser.add_argument("-c", "--command", type=str, required=False, help="Send raw text command instead of input file")
+parser.add_argument("-f", "--frameSize", type=int, required=False, help="Size of transmited frame")
 parser.add_argument("-d", "--device", type=str, required=True, help="BLE device MAC address")
-parser.add_argument("-di", "--deviceInfo", action='store_true', required=False, help="Device info only")
 args = parser.parse_args()
 
 defaultReadChar = None
 defaultWriteChar = None
 defaultNotifyChar = None
+defaultFrameSize=256
+
+# Args - set default frameSize
+if (args.frameSize is not None):
+    defaultFrameSize=args.frameSize
 
 sys.stdout.write("Connecting to %s.\n" % args.device)
 dev = btle.Peripheral(args.device)
@@ -41,11 +46,24 @@ def GetDeviceInfo(dev):
                 value = characteristics.read()
                 print "Value", binascii.b2a_hex(value)
 
+# Transmit data to device characteristics
+def TransmittData(char,data,limit):
+    DataFill=" "
+    DataLength=len(data)
+    position=0
+    while (position < DataLength):
+        tmpBuffer=data[position:position+limit]
+        tmpBuffer+="".join([" "]*(limit-len(tmpBuffer)))
+        sys.stdout.write("Write '%s' to characteristic %s.\n" % (tmpBuffer, char.uuid))
+        char.write(tmpBuffer,withResponse=True)
+        position+=len(tmpBuffer)
+
+
 # Always get device info and read
 GetDeviceInfo(dev)
 
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
-        defaultWriteChar.write(args.command,withResponse=True)
+        TransmittData(defaultWriteChar,args.command, defaultFrameSize)
 
