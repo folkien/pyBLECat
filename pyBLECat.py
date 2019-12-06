@@ -54,7 +54,7 @@ def TransmittData(char,data,limit):
     while (position < DataLength):
         tmpBuffer=data[position:position+limit]
         tmpBuffer+="".join(["\0"]*(limit-len(tmpBuffer)))
-        sys.stdout.write("Write '%s' to characteristic %s.\n" % (tmpBuffer, char.uuid))
+        sys.stdout.write("Write %s to characteristic %s.\n" % (repr(tmpBuffer), char.uuid))
         char.write(tmpBuffer,withResponse=True)
         position+=len(tmpBuffer)
 
