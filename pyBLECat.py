@@ -48,7 +48,6 @@ def GetDeviceInfo(dev):
 
 # Transmit data to device characteristics
 def TransmittData(char,data,limit):
-    DataFill=" "
     DataLength=len(data)
     position=0
     while (position < DataLength):
@@ -58,6 +57,13 @@ def TransmittData(char,data,limit):
         char.write(tmpBuffer,withResponse=True)
         position+=len(tmpBuffer)
 
+# Read data from device characteristics
+# timeout given i seconds
+def ReceiveData(char,rxData,timeout=1):
+    startTime=time.time()
+    while ((time.time() - startTime) < timeout):
+        rxData = char.read()
+        sys.stdout.write("Read %s from characteristic %s.\n" % (repr(rxData), char.uuid))
 
 # Always get device info and read
 GetDeviceInfo(dev)
@@ -65,5 +71,7 @@ GetDeviceInfo(dev)
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
+        rxData=""
         TransmittData(defaultWriteChar,args.command+"\n", defaultFrameSize)
+        ReceiveData(defaultWriteChar,rxData)
 
