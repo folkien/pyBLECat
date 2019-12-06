@@ -44,7 +44,7 @@ def GetDeviceInfo(dev):
             if (characteristics.properties & btle.Characteristic.props["READ"]):
                 defaultReadChar = characteristics
                 value = characteristics.read()
-                print "Value", binascii.b2a_hex(value)
+                print "  Value", binascii.b2a_hex(value)
 
 # Transmit data to device characteristics
 def TransmittData(char,data,limit):
@@ -53,7 +53,7 @@ def TransmittData(char,data,limit):
     position=0
     while (position < DataLength):
         tmpBuffer=data[position:position+limit]
-        tmpBuffer+="".join([" "]*(limit-len(tmpBuffer)))
+        tmpBuffer+="".join(["\0"]*(limit-len(tmpBuffer)))
         sys.stdout.write("Write '%s' to characteristic %s.\n" % (tmpBuffer, char.uuid))
         char.write(tmpBuffer,withResponse=True)
         position+=len(tmpBuffer)
@@ -65,5 +65,5 @@ GetDeviceInfo(dev)
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
-        TransmittData(defaultWriteChar,args.command, defaultFrameSize)
+        TransmittData(defaultWriteChar,args.command+"\n", defaultFrameSize)
 
