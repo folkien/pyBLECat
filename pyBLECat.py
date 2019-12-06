@@ -7,6 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--inputFile", type=str, required=False, help="input file")
 parser.add_argument("-o", "--outputFile", type=str, required=False, help="output file")
 parser.add_argument("-d", "--device", type=str, required=True, help="BLE device MAC address")
+parser.add_argument("-di", "--deviceInfo", action='store_true', required=False, help="Device info only")
 args = parser.parse_args()
 
 print "Connecting..."
@@ -20,5 +21,8 @@ def GetDeviceInfo(dev):
         for characteristics in service.getCharacteristics():
             sys.stdout.write("  %s - " % (characteristics.uuid))
             sys.stdout.write("%s\n" % (characteristics.propertiesToString()))
+            if characteristics.supportsRead():
+                value = characteristics.read()
+                print "Value", binascii.b2a_hex(value)
 
 GetDeviceInfo(dev)
