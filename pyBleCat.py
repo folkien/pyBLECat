@@ -157,12 +157,13 @@ def RxNotifications(handle, value):
     global outFile
     global TotalRxBytes
     global RxRunning
+    global RxLastDataTime
     global rxSize
 
     # Write data if RX enabled
     if ((RxRunning==1) and (outFile is not None)):
-        outFile.write(value)
         RxLastDataTime=time.time()
+        outFile.write(value)
 
     # Update total RX size and check if finished
     TotalRxBytes+=len(value)
