@@ -7,6 +7,7 @@ from binascii import hexlify
 from bluepy import btle
 
 # default variables
+result=0 # Program result return at then end of main
 adapter = None
 defaultReadChar = None
 defaultWriteChar = None
@@ -68,6 +69,15 @@ if (not args.rxSize is not None):
     rxSize=inputSize
 else:
     rxSize=args.rxSize
+
+# MD5 of file ( only path given as argument )
+def FileMD5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
 
 # Function to Get BLE device info
 def Bluepy_GetDeviceInfo(address):
@@ -202,6 +212,16 @@ if (args.inputFile is not None):
         if (RxRunning == 0):
             break;
 
+# Check files md5 sums if enabled
+if ((args.check) and (args.inputFile is not None) and (args.outputFile is not None)):
+    sumInput=FileMD5(args.inputFile)
+    sumOutput=FileMD5(args.outputFile)
+    sys.stdout.write("Input file MD5 %s\n" % sumInput)
+    sys.stdout.write("Output file MD5 %s\n" % sumOutput)
+    if (sumInput != sumOutput):
+        sys.stdout.write("Checksum error!\n")
+        result=-1
+
 
 # Closing
 if (inFile is not None):
@@ -214,3 +234,4 @@ if (adapter is not None):
     sys.stdout.write("Disconnecting from %s.\n" % args.device)
     adapter.stop()
 
+sys.exit(result)
