@@ -89,7 +89,7 @@ def TransmitData(dev,uuid,data,limit):
     while (position < DataLength):
         tmpBuffer=data[position:position+limit]
         tmpBuffer+="".join(["\0"]*(limit-len(tmpBuffer)))
-        sys.stdout.write("Write %s to characteristic %s.\n" % (repr(tmpBuffer), uuid))
+        sys.stdout.write("> Write %s to %s.\n" % (repr(tmpBuffer), uuid))
         dev.char_write_handle(handle,bytearray(tmpBuffer,'utf-8'))
         position+=len(tmpBuffer)
 
@@ -99,7 +99,7 @@ def handle_data(handle, value):
     handle -- integer, characteristic read handle the data was received on
     value -- bytearray, the data returned in the notification
     """
-    print("Received data: %s" % hexlify(value))
+    print("< Received %s" % hexlify(value))
 
 # main()
 # ------------------------------------------------------------
@@ -120,10 +120,7 @@ if (args.command is not None):
         TransmitData(device,defaultWriteChar,args.command+"\n",defaultFrameSize)
 
 
-#startTime=time.time()
-#while ((time.time()-startTime) < defaultTimeout):
-    time.sleep(1)
-    # do nothing
+time.sleep(defaultTimeout)
 
 sys.stdout.write("Disconnecting from %s.\n" % args.device)
 adapter.stop()
