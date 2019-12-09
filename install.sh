@@ -13,4 +13,4 @@ if [ "${1}" == "deps" ]; then
     sudo pip install pygatt
     sudo pip install --user bleak
 fi
-sudo ln -sf ${DIR}/pyBleCat.py /usr/bin/pyBleCat
+sudo ln -sf ${DIR}/pyBleCat.py /usr/bin/bleCat
