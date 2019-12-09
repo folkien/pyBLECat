@@ -87,12 +87,28 @@ def ReceiveData(dev,char,timeout=1):
         rxData = char.read()
         sys.stdout.write("Read %s from characteristic %s.\n" % (repr(rxData), char.uuid))
 
+def turn_on_notifications(per):
+     print "hello"
+     setup_data = b"\x01\x00"
+     notify = per.getCharacteristics(uuid='00002902-0000-1000-8000-00805f9b34fb')[0]
+     notify_handle = notify.getHandle() + 1
+     per.writeCharacteristic(notify_handle, setup_data, withResponse=True)
+#    svc = peripheral.getServiceByUUID("00002902-0000-1000-8000-00805f9b34fb")
+#    ch = svc.getCharacteristics(read_uuid)[0]
+#     ch = dev.getCharacteristics(uuid=0x0025)[0]
+#     peripheral.writeCharacteristic(ch.getHandle() + 1, struct.pack('<bb', 0x01, 0x00), True)
+
 # BLE connection
 sys.stdout.write("Connecting to %s.\n" % args.device)
 dev = btle.Peripheral(args.device)
 dev.setDelegate( ReadDelegate() )
 
+# Always get device info and read
+GetDeviceInfo(dev)
+
 # enable notifcations
+turn_on_notifications(dev)
+
 ##srv = dev.getServiceByUUID(btle.UUID(0x2902))
 
 #dev.writeCharacteristic(, "0x0100")
@@ -101,8 +117,6 @@ dev.setDelegate( ReadDelegate() )
 #notifyConf.write(0x0101)
 #dev.writeCharacteristic(0x2902,0x0100)
 
-# Always get device info and read
-GetDeviceInfo(dev)
 
 # If text command should be sent
 if (args.command is not None):
