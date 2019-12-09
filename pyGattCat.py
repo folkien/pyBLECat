@@ -1,3 +1,4 @@
+#!/usr/bin/python2.7
 import pygatt
 import argparse, os, sys
 import time, binascii
@@ -28,6 +29,20 @@ if (args.frameSize is not None):
 if (args.timeout is not None):
     defaultTimeout=args.timeout
 
+# Function to Get BLE device info
+def GetDeviceInfo(dev):
+    global defaultWriteChar
+    global defaultReadChar
+    global defaultNotifyChar
+
+    # Descriptors list
+    sys.stdout.write("Device %s :\n" % (dev._address))
+
+    # Characteristics list
+    for uuid in device.discover_characteristics():
+        charObject = device._characteristics[uuid]
+        print  "<uuid=%s handle=0x%04x>" % (charObject.uuid, charObject.handle)
+
 
 # Transmit data to device characteristics
 def TransmitData(dev,uuid,data,limit):
@@ -49,21 +64,27 @@ def handle_data(handle, value):
     """
     print("Received data: %s" % hexlify(value))
 
-try:
-    char="00001027-1212-efde-1523-785feabcd123"
-    adapter.start()
-    device = adapter.connect(args.device)
-    handle = device.get_handle(char)
-    TransmitData(device,char,args.command+"\n",args.frameSize)
+# Start Adapter and connect to device
+adapter.start()
+sys.stdout.write("Connecting to %s.\n" % args.device)
+device = adapter.connect(args.device)
+
+# Get device info
+GetDeviceInfo(device)
+
+#device.subscribe("00001011-1212-efde-1523-785feabcd123",
+#                    callback=handle_data)
+
+# If text command should be sent
+if (args.command is not None):
+    if (defaultWriteChar is not None):
+        TransmitData(device,char,args.command+"\n",args.frameSize)
 
 
-    device.subscribe("00001011-1212-efde-1523-785feabcd123",
-                     callback=handle_data)
 
-    startTime=time.time()
-    while ((time.time()-startTime) < defaultTimeout):
-        time.sleep(1)
-        # do nothing
+startTime=time.time()
+while ((time.time()-startTime) < defaultTimeout):
+    time.sleep(1)
+    # do nothing
 
-finally:
-    adapter.stop()
+adapter.stop()
