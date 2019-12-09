@@ -63,6 +63,8 @@ if (args.inputFile is not None):
     inputSize = os.stat(args.inputFile).st_size
 if (args.txSize is not None):
     inputSize=args.txSize
+if (args.command is not None):
+    inputSize=len(args.command)
 
 #Config check
 if (not args.rxSize is not None):
@@ -132,6 +134,7 @@ def GetDeviceInfo(dev):
 
 # Transmit data to device characteristics
 def TransmitData(dev,uuid,data,limit):
+    global TotalTxBytes
     handle = dev.get_handle(uuid)
     DataLength=len(data)
     position=0
@@ -142,6 +145,8 @@ def TransmitData(dev,uuid,data,limit):
         dev.char_write_handle(handle,bytearray(tmpBuffer,'utf-8'))
         position+=len(tmpBuffer)
 
+    TotalTxBytes+=DataLength
+
 
 # Receive data from notifications
 def RxNotifications(handle, value):
@@ -150,24 +155,35 @@ def RxNotifications(handle, value):
     global RxRunning
     global rxSize
 
-    if (outFile is not None):
+    # Write data if RX enabled
+    if ((RxRunning==1) and (outFile is not None)):
         outFile.write(value)
 
+    # Update total RX size and check if finished
     TotalRxBytes+=len(value)
     if (TotalRxBytes >= rxSize):
         RxRunning=0
+
+# Wait on receiver to end job
+def RxWait():
+    while (RxRunning == 1):
+        sys.stdout.write("\rTransmitted %d/%dB. Readed %d/%dB. Delta = %dB.  " % (TotalTxBytes,inputSize,TotalRxBytes,rxSize,TotalTxBytes-rxSize))
+        time.sleep(0.1)
+    sys.stdout.write("\n")
+
 
 # Enable receiving
 def RxEnable(device):
     global outFile
     global RxRunning
+    global args
 
     # Open output file to append or write clear
-    print "Output to ",args.outputFile,"."
-    if (args.appendOutputFile is not None):
+    if (args.appendOutputFile):
         outFile = open(args.outputFile,'a+')
     else:
         outFile = open(args.outputFile,'w')
+    print "Output to %s(%s)" % (args.outputFile,outFile.mode)
     device.subscribe(defaultNotifyChar, callback=RxNotifications)
     RxRunning=1
 
@@ -211,6 +227,9 @@ if (args.inputFile is not None):
             time.sleep(args.frameDelay)
         if (RxRunning == 0):
             break;
+
+# Wait on reading thread and close port
+RxWait()
 
 # Check files md5 sums if enabled
 if ((args.check) and (args.inputFile is not None) and (args.outputFile is not None)):
