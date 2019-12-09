@@ -19,6 +19,8 @@ defaultTimeout=1
 outFile=None
 inFile=None
 inputSize=0
+RxLastDataTime=time.time()
+TxLastDataTime=time.time()
 RxRunning=0
 TxRunning=0
 TotalRxBytes=0
@@ -158,6 +160,7 @@ def RxNotifications(handle, value):
     # Write data if RX enabled
     if ((RxRunning==1) and (outFile is not None)):
         outFile.write(value)
+        RxLastDataTime=time.time()
 
     # Update total RX size and check if finished
     TotalRxBytes+=len(value)
@@ -166,9 +169,17 @@ def RxNotifications(handle, value):
 
 # Wait on receiver to end job
 def RxWait():
+    global RxRunning
+    global RxLastDataTime
+    global defaultTimeout
+
+    # Wait until receiving all data or receivng timeout happend
     while (RxRunning == 1):
         sys.stdout.write("\rTransmitted %d/%dB. Readed %d/%dB. Delta = %dB.  " % (TotalTxBytes,inputSize,TotalRxBytes,rxSize,TotalTxBytes-rxSize))
         time.sleep(0.1)
+        if ((time.time()-RxLastDataTime)>defaultTimeout):
+            print "\nRxData timeout %us happend!" % (defaultTimeout)
+            break;
     sys.stdout.write("\n")
 
 
