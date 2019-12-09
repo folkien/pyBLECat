@@ -42,7 +42,7 @@ def GetDeviceInfo(dev):
     global defaultReadChar
     global defaultNotifyChar
     sys.stdout.write("Device %s services :\n" % (dev.addr))
-    for service in dev.services:
+    for service in dev.getServices():
         sys.stdout.write(" %s :\n" % (str(service)))
         for characteristics in service.getCharacteristics():
             sys.stdout.write("  %s - " % (characteristics.uuid))
@@ -86,8 +86,12 @@ dev = btle.Peripheral(args.device)
 dev.setDelegate( ReadDelegate() )
 
 # enable notifcations
-notifyConf = dev.getCharacteristics(btle.UUID(0x2902))
-notifyConf.write(0x0100)
+##srv = dev.getServiceByUUID(btle.UUID(0x2902))
+
+#dev.writeCharacteristic(, "0x0100")
+
+#notifyConf = dev.getCharacteristics(btle.UUID("00002902-0000-1000-8000-00805f9b34fb"))
+#notifyConf.write(0x0101)
 #dev.writeCharacteristic(0x2902,0x0100)
 
 # Always get device info and read
