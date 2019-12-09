@@ -41,6 +41,13 @@ def GetDeviceInfo(dev):
     global defaultWriteChar
     global defaultReadChar
     global defaultNotifyChar
+
+    # Descriptors list
+    sys.stdout.write("Device %s descriptors :\n" % (dev.addr))
+    for desc in dev.getDescriptors():
+        sys.stdout.write(" %s :\n" % (str(desc)))
+
+    # Services list
     sys.stdout.write("Device %s services :\n" % (dev.addr))
     for service in dev.getServices():
         sys.stdout.write(" %s :\n" % (str(service)))
