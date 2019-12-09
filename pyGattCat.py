@@ -3,6 +3,7 @@ import pygatt
 import argparse, os, sys
 import time, binascii
 from binascii import hexlify
+from bluepy import btle
 
 # default variables
 adapter = pygatt.GATTToolBackend()
@@ -28,6 +29,42 @@ if (args.frameSize is not None):
 
 if (args.timeout is not None):
     defaultTimeout=args.timeout
+
+# Function to Get BLE device info
+def Bluepy_GetDeviceInfo(address):
+    global defaultWriteChar
+    global defaultReadChar
+    global defaultNotifyChar
+
+    sys.stdout.write("Connecting to %s and reading...\n" % args.device)
+    dev = btle.Peripheral()
+    dev.connect(address)
+
+    # Descriptors list
+    sys.stdout.write("Device %s descriptors :\n" % (dev.addr))
+    for desc in dev.getDescriptors():
+        sys.stdout.write(" %s :\n" % (str(desc)))
+
+    # Services list
+    sys.stdout.write("Device %s services :\n" % (dev.addr))
+    for service in dev.getServices():
+        sys.stdout.write(" %s :\n" % (str(service)))
+        for characteristics in service.getCharacteristics():
+            sys.stdout.write("  %s - " % (characteristics.uuid))
+            sys.stdout.write("%04x %s\n" % (characteristics.properties, characteristics.propertiesToString()))
+            # If WRITE property
+            if (characteristics.properties & btle.Characteristic.props["WRITE"]):
+                defaultWriteChar=characteristics.uuid.getCommonName()
+            # If NOTIFY property
+            if (characteristics.properties & btle.Characteristic.props["NOTIFY"]):
+                defaultNotifyChar=characteristics.uuid.getCommonName()
+            # If READ property
+            if (characteristics.properties & btle.Characteristic.props["READ"]):
+                defaultReadChar = characteristics.uuid.getCommonName()
+                value = characteristics.read()
+                print "  Value", binascii.b2a_hex(value)
+
+    dev.disconnect()
 
 # Function to Get BLE device info
 def GetDeviceInfo(dev):
@@ -64,27 +101,29 @@ def handle_data(handle, value):
     """
     print("Received data: %s" % hexlify(value))
 
-# Start Adapter and connect to device
+# main()
+# ------------------------------------------------------------
+
+# Get device info through Bluepy
+Bluepy_GetDeviceInfo(args.device)
+
+
+# Start Adapter, connect to device and callback notifications
 adapter.start()
 sys.stdout.write("Connecting to %s.\n" % args.device)
 device = adapter.connect(args.device)
-
-# Get device info
-GetDeviceInfo(device)
-
-#device.subscribe("00001011-1212-efde-1523-785feabcd123",
-#                    callback=handle_data)
+device.subscribe(defaultNotifyChar, callback=handle_data)
 
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
-        TransmitData(device,char,args.command+"\n",args.frameSize)
+        TransmitData(device,defaultWriteChar,args.command+"\n",defaultFrameSize)
 
 
-
-startTime=time.time()
-while ((time.time()-startTime) < defaultTimeout):
+#startTime=time.time()
+#while ((time.time()-startTime) < defaultTimeout):
     time.sleep(1)
     # do nothing
 
+sys.stdout.write("Disconnecting from %s.\n" % args.device)
 adapter.stop()
