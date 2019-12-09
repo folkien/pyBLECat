@@ -2,33 +2,72 @@
 import pygatt
 import argparse, os, sys
 import time, binascii
+import hashlib
 from binascii import hexlify
 from bluepy import btle
 
 # default variables
-adapter = pygatt.GATTToolBackend()
+adapter = None
 defaultReadChar = None
 defaultWriteChar = None
 defaultNotifyChar = None
 defaultFrameSize=256
 defaultTimeout=1
 
+# Variable with program states
+outFile=None
+inFile=None
+inputSize=0
+RxRunning=0
+TxRunning=0
+TotalRxBytes=0
+TotalTxBytes=0
+
 # Parsing and configuration
 parser = argparse.ArgumentParser()
+# File and input options
 parser.add_argument("-i", "--inputFile", type=str, required=False, help="input file")
 parser.add_argument("-o", "--outputFile", type=str, required=False, help="output file")
-parser.add_argument("-c", "--command", type=str, required=False, help="Send raw text command instead of input file")
-parser.add_argument("-f", "--frameSize", type=int, required=False, help="Size of transmited frame")
-parser.add_argument("-t", "--timeout", type=int, required=False, help="Timeout during transmission/receiving")
+parser.add_argument("-a", "--appendOutputFile", action='store_true', required=False, help="Append output file instead of create and write")
+parser.add_argument("-g", "--command", type=str, required=False, help="Send raw text command instead of input file")
+# Bluetooth options
 parser.add_argument("-d", "--device", type=str, required=True, help="BLE device MAC address")
+# General communication options
+parser.add_argument("-f", "--frameSize", type=int, required=False, help="Size of transmited frame")
+parser.add_argument("-fd", "--frameDelay", type=float, required=False, help="Delay of transmited frame in seconds (float)")
+parser.add_argument("-rd", "--receiveDelay", type=float, required=False, help="Extra receive delay of transmited frame in seconds (float)")
+parser.add_argument("-rx", "--rxSize", type=int, required=False, help="Size of received total data")
+parser.add_argument("-tx", "--txSize", type=int, required=False, help="Size of transmitted total data")
+parser.add_argument("-t", "--timeout", type=int, required=False, help="Timeout during transmission/receiving")
+# Extra options
+parser.add_argument("-c", "--check", action='store_true', required=False, help="Checks if input file is equal to output file.")
+parser.add_argument("-p", "--preview", action='store_true', required=False, help="Preview data")
 args = parser.parse_args()
+
+#Assert
+if (not args.device):
+    print "No device"
+    sys.exit(1)
 
 # Args - set default frameSize
 if (args.frameSize is not None):
     defaultFrameSize=args.frameSize
 
+# Config timeout check
 if (args.timeout is not None):
     defaultTimeout=args.timeout
+
+# Read input file size
+if (args.inputFile is not None):
+    inputSize = os.stat(args.inputFile).st_size
+if (args.txSize is not None):
+    inputSize=args.txSize
+
+#Config check
+if (not args.rxSize is not None):
+    rxSize=inputSize
+else:
+    rxSize=args.rxSize
 
 # Function to Get BLE device info
 def Bluepy_GetDeviceInfo(address):
@@ -94,12 +133,34 @@ def TransmitData(dev,uuid,data,limit):
         position+=len(tmpBuffer)
 
 
-def handle_data(handle, value):
-    """
-    handle -- integer, characteristic read handle the data was received on
-    value -- bytearray, the data returned in the notification
-    """
-    print("< Received %s" % hexlify(value))
+# Receive data from notifications
+def RxNotifications(handle, value):
+    global outFile
+    global TotalRxBytes
+    global RxRunning
+    global rxSize
+
+    if (outFile is not None):
+        outFile.write(value)
+
+    TotalRxBytes+=len(value)
+    if (TotalRxBytes >= rxSize):
+        RxRunning=0
+
+# Enable receiving
+def RxEnable(device):
+    global outFile
+    global RxRunning
+
+    # Open output file to append or write clear
+    print "Output to ",args.outputFile,"."
+    if (args.appendOutputFile is not None):
+        outFile = open(args.outputFile,'a+')
+    else:
+        outFile = open(args.outputFile,'w')
+    device.subscribe(defaultNotifyChar, callback=RxNotifications)
+    RxRunning=1
+
 
 # main()
 # ------------------------------------------------------------
@@ -107,20 +168,49 @@ def handle_data(handle, value):
 # Get device info through Bluepy
 Bluepy_GetDeviceInfo(args.device)
 
-
 # Start Adapter, connect to device and callback notifications
+adapter = pygatt.GATTToolBackend()
 adapter.start()
 sys.stdout.write("Connecting to %s.\n" % args.device)
 device = adapter.connect(args.device)
-device.subscribe(defaultNotifyChar, callback=handle_data)
+
+# Enable Rx if needed
+if (args.outputFile is not None):
+    RxEnable(device)
 
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
         TransmitData(device,defaultWriteChar,args.command+"\n",defaultFrameSize)
+        time.sleep(defaultTimeout)
+
+# If input file defined
+if (args.inputFile is not None):
+    # Open write file and send lines
+    print "Input from ",args.inputFile,"(",inputSize,"Bytes)."
+    inFile = open(args.inputFile,'r')
+    for chunk in iter(lambda: inFile.read(min(defaultFrameSize,inputSize-TxTransmitted)), ''):
+        writeSize       = TransmitData(device,defaultWriteChar,chunk,defaultFrameSize)
+        TxTransmitted   += writeSize
+
+        # Transmitted data preview if set
+        if (args.preview):
+            sys.stdout.write("Tx:%s\n" % (chunk))
+        # Wait frame delay if set
+        if (args.frameDelay is not None):
+            time.sleep(args.frameDelay)
+        if (RxRunning == 0):
+            break;
 
 
-time.sleep(defaultTimeout)
+# Closing
+if (inFile is not None):
+    inFile.close()
 
-sys.stdout.write("Disconnecting from %s.\n" % args.device)
-adapter.stop()
+if (outFile is not None):
+    outFile.close()
+
+if (adapter is not None):
+    sys.stdout.write("Disconnecting from %s.\n" % args.device)
+    adapter.stop()
+
