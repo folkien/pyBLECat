@@ -143,9 +143,11 @@ def TransmitData(dev,uuid,data,limit):
     while (position < DataLength):
         tmpBuffer=data[position:position+limit]
         tmpBuffer+="".join(["\0"]*(limit-len(tmpBuffer)))
-        sys.stdout.write("> Write %s to %s.\n" % (repr(tmpBuffer), uuid))
         dev.char_write_handle(handle,bytearray(tmpBuffer,'utf-8'))
         position+=len(tmpBuffer)
+        # If TX preview enabled
+        if (args.preview):
+            sys.stdout.write("> TX %s to %s.\n" % (repr(tmpBuffer), uuid))
 
     TotalTxBytes+=DataLength
 
@@ -226,18 +228,12 @@ if (args.inputFile is not None):
     # Open write file and send lines
     print "Input from ",args.inputFile,"(",inputSize,"Bytes)."
     inFile = open(args.inputFile,'r')
-    for chunk in iter(lambda: inFile.read(min(defaultFrameSize,inputSize-TxTransmitted)), ''):
-        writeSize       = TransmitData(device,defaultWriteChar,chunk,defaultFrameSize)
-        TxTransmitted   += writeSize
+    for chunk in iter(lambda: inFile.read(min(defaultFrameSize,inputSize-TotalTxBytes)), ''):
+        TransmitData(device,defaultWriteChar,chunk,defaultFrameSize)
 
-        # Transmitted data preview if set
-        if (args.preview):
-            sys.stdout.write("Tx:%s\n" % (chunk))
         # Wait frame delay if set
         if (args.frameDelay is not None):
             time.sleep(args.frameDelay)
-        if (RxRunning == 0):
-            break;
 
 # Wait on reading thread and close port
 RxWait()
