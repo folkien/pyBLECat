@@ -19,6 +19,7 @@ defaultTimeout=1
 outFile=None
 inFile=None
 inputSize=0
+TxRxStartTime=time.time()
 RxLastDataTime=time.time()
 TxLastDataTime=time.time()
 RxRunning=0
@@ -41,7 +42,8 @@ parser.add_argument("-fd", "--frameDelay", type=float, required=False, help="Del
 parser.add_argument("-rd", "--receiveDelay", type=float, required=False, help="Extra receive delay of transmited frame in seconds (float)")
 parser.add_argument("-rx", "--rxSize", type=int, required=False, help="Size of received total data")
 parser.add_argument("-tx", "--txSize", type=int, required=False, help="Size of transmitted total data")
-parser.add_argument("-t", "--timeout", type=int, required=False, help="Timeout during transmission/receiving")
+parser.add_argument("-t", "--timeout", type=int, required=False, help="Timeout of no data during transmission/receiving")
+parser.add_argument("-wt", "--workTime", type=float, required=False, help="Total wroking time of program [s]")
 # Extra options
 parser.add_argument("-c", "--check", action='store_true', required=False, help="Checks if input file is equal to output file.")
 parser.add_argument("-p", "--preview", action='store_true', required=False, help="Preview data")
@@ -133,9 +135,24 @@ def GetDeviceInfo(dev):
         charObject = device._characteristics[uuid]
         print  "<uuid=%s handle=0x%04x>" % (charObject.uuid, charObject.handle)
 
+# Checks if program should be stopped
+def CheckTxRxTime():
+    global RxRunning
+    global TxRunning
+
+    # If TxRxTime exceeded then stop
+    if (args.workTime is not None):
+        if ((time.time()-TxRxStartTime) > args.workTime):
+            RxRunning=0
+            TxRunning=0
+            print "\nTotal work timeout %us happend!" % (args.workTime)
+            return True
+
+    return False
+
 
 # Transmit data to device characteristics
-def TransmitData(dev,uuid,data,limit):
+def TxTransmit(dev,uuid,data,limit):
     global TotalTxBytes
     handle = dev.get_handle(uuid)
     DataLength=len(data)
@@ -160,15 +177,17 @@ def RxNotifications(handle, value):
     global RxLastDataTime
     global rxSize
 
-    # Write data if RX enabled
-    if ((RxRunning==1) and (outFile is not None)):
-        RxLastDataTime=time.time()
-        outFile.write(value)
+    # Processing only if RxRunning
+    if (RxRunning==1):
+        # Save to file if defined
+        if  (outFile is not None):
+            RxLastDataTime=time.time()
+            outFile.write(value)
 
-    # Update total RX size and check if finished
-    TotalRxBytes+=len(value)
-    if (TotalRxBytes >= rxSize):
-        RxRunning=0
+        # Update total RX size and check if finished
+        TotalRxBytes+=len(value)
+        if (TotalRxBytes >= rxSize):
+            RxRunning=0
 
 # Wait on receiver to end job
 def RxWait():
@@ -179,10 +198,19 @@ def RxWait():
     # Wait until receiving all data or receivng timeout happend
     while (RxRunning == 1):
         sys.stdout.write("\rTransmitted %d/%dB. Readed %d/%dB. Delta = %dB.  " % (TotalTxBytes,inputSize,TotalRxBytes,rxSize,TotalTxBytes-rxSize))
-        time.sleep(0.1)
+
+        # Check RX data timeout
         if ((time.time()-RxLastDataTime)>defaultTimeout):
+            RxRunning=0
             print "\nRxData timeout %us happend!" % (defaultTimeout)
             break;
+
+        # If TxRxTime exceeded then stop
+        if (CheckTxRxTime()):
+            break
+
+        time.sleep(0.1)
+
     sys.stdout.write("\n")
 
 
@@ -214,6 +242,9 @@ adapter.start()
 sys.stdout.write("Connecting to %s.\n" % args.device)
 device = adapter.connect(args.device)
 
+# Set this moment as begining of Tx/Rx
+TxRxStartTime=time.time()
+
 # Enable Rx if needed
 if (args.outputFile is not None):
     RxEnable(device)
@@ -221,7 +252,7 @@ if (args.outputFile is not None):
 # If text command should be sent
 if (args.command is not None):
     if (defaultWriteChar is not None):
-        TransmitData(device,defaultWriteChar,args.command+"\n",defaultFrameSize)
+        TxTransmit(device,defaultWriteChar,args.command+"\n",defaultFrameSize)
         time.sleep(defaultTimeout)
 
 # If input file defined
@@ -230,11 +261,15 @@ if (args.inputFile is not None):
     print "Input from ",args.inputFile,"(",inputSize,"Bytes)."
     inFile = open(args.inputFile,'r')
     for chunk in iter(lambda: inFile.read(min(defaultFrameSize,inputSize-TotalTxBytes)), ''):
-        TransmitData(device,defaultWriteChar,chunk,defaultFrameSize)
+        TxTransmit(device,defaultWriteChar,chunk,defaultFrameSize)
 
         # Wait frame delay if set
         if (args.frameDelay is not None):
             time.sleep(args.frameDelay)
+
+        # If TxRxTime exceeded then stop
+        if (CheckTxRxTime()):
+            break
 
 # Wait on reading thread and close port
 RxWait()
