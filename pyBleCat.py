@@ -135,6 +135,11 @@ def GetDeviceInfo(dev):
         charObject = device._characteristics[uuid]
         print  "<uuid=%s handle=0x%04x>" % (charObject.uuid, charObject.handle)
 
+# Get total work time
+def GetWorkTime():
+    global TxRxStartTime
+    return (time.time()-TxRxStartTime)
+
 # Checks if program should be stopped
 def CheckTxRxTime():
     global RxRunning
@@ -142,7 +147,7 @@ def CheckTxRxTime():
 
     # If TxRxTime exceeded then stop
     if (args.workTime is not None):
-        if ((time.time()-TxRxStartTime) > args.workTime):
+        if (GetWorkTime() > args.workTime):
             RxRunning=0
             TxRunning=0
             print "\nTotal work timeout %us happend!" % (args.workTime)
@@ -197,7 +202,7 @@ def RxWait():
 
     # Wait until receiving all data or receivng timeout happend
     while (RxRunning == 1):
-        sys.stdout.write("\rTransmitted %d/%dB. Readed %d/%dB. Delta = %dB.  " % (TotalTxBytes,inputSize,TotalRxBytes,rxSize,TotalTxBytes-rxSize))
+        sys.stdout.write("\r(%us) Transmitted %d/%dB. Readed %d/%dB. Delta = %dB.  " % (GetWorkTime(),TotalTxBytes,inputSize,TotalRxBytes,rxSize,TotalTxBytes-rxSize))
 
         # Check RX data timeout
         if ((time.time()-RxLastDataTime)>defaultTimeout):
