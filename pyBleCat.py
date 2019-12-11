@@ -9,6 +9,7 @@ from bluepy import btle
 # default variables
 result=0 # Program result return at then end of main
 adapter = None
+ConfigAsciiMode=True
 defaultReadChar = None
 defaultWriteChar = None
 defaultNotifyChar = None
@@ -184,6 +185,10 @@ def RxNotifications(handle, value):
 
     # Processing only if RxRunning
     if (RxRunning==1):
+        # if ASCII mode replace nonprintables
+        if ((ConfigAsciiMode==True)):
+            value=value.replace(chr(0),"")
+
         # Save to file if defined
         if  (outFile is not None):
             RxLastDataTime=time.time()
